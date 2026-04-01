@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ประกาศคะแนนเก็บ Hydrology 3/2568</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #080d18;
+            --bg-card: rgba(12,20,40,0.88);
+            --blueprint: #071a30;
+            --grid-line: rgba(56,182,255,0.07);
+            --grid-line-major: rgba(56,182,255,0.13);
+            --steel: #1e2d45;
+            --steel-mid: #2d4060;
+            --steel-light: #4a6080;
+            --hydro: #0ea5e9;
+            --hydro-light: #38bdf8;
+            --hydro-pale: rgba(14,165,233,0.12);
+            --teal: #0d9488;
+            --cyan: #06b6d4;
+            --amber: #f59e0b;
+            --amber-light: #fbbf24;
+            --success: #10b981;
+            --success-light: #34d399;
+            --danger: #f87171;
+            --danger-dark: #ef4444;
+            --text-primary: #e2e8f0;
+            --text-muted: #64748b;
+            --text-dim: rgba(148,163,184,0.5);
+            --mono: 'IBM Plex Mono', monospace;
+            --glass-border: rgba(56,182,255,0.15);
+            --glass-border-strong: rgba(56,182,255,0.28);
+            --radius: 4px;
+            --radius-md: 6px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'IBM Plex Sans Thai', 'Inter', sans-serif;
+            background: var(--bg-deep);
+            min-height: 100vh;
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        /* ===== BLUEPRINT BACKGROUND ===== */
+        .bg-blueprint {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background:
+                linear-gradient(180deg, #060c1a 0%, #080f20 40%, #060c1a 100%);
+            overflow: hidden;
+        }
+
+        /* Blueprint grid */
+        .bg-blueprint::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                repeating-linear-gradient(var(--grid-line) 1px, transparent 1px, transparent 40px),
+                repeating-linear-gradient(90deg, var(--grid-line) 1px, transparent 1px, transparent 40px),
+                repeating-linear-gradient(var(--grid-line-major) 1px, transparent 1px, transparent 200px),
+                repeating-linear-gradient(90deg, var(--grid-line-major) 1px, transparent 1px, transparent 200px);
+        }
+
+        /* Scanline overlay */
+        .bg-blueprint::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.03) 2px,
+                rgba(0,0,0,0.03) 4px
+            );
+            pointer-events: none;
+        }
+
+        /* Flow lines */
+        .flow-lines {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+        }
+        .flow-line {
+            position: absolute;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(14,165,233,0.4), transparent);
+            animation: flowMove linear infinite;
+        }
+        @keyframes flowMove {
+            0%   { transform: translateX(-100%); opacity: 0; }
+            10%  { opacity: 1; }
+            90%  { opacity: 0.6; }
+            100% { transform: translateX(200vw); opacity: 0; }
+        }
+
+        /* Glow spots */
+        .glow-spot {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            pointer-events: none;
+        }
+        .glow-1 {
+            width: 500px; height: 500px;
+            background: radial-gradient(circle, rgba(14,165,233,0.12), transparent 70%);
+            top: -100px; left: -100px;
+            animation: glowPulse 12s ease-in-out infinite;
+        }
+        .glow-2 {
+            width: 400px; height: 400px;
+            background: radial-gradient(circle, rgba(13,148,136,0.1), transparent 70%);
+            bottom: 20%; right: -80px;
+            animation: glowPulse 15s ease-in-out infinite reverse;
+        }
+        @keyframes glowPulse {
+            0%, 100% { opacity: 0.6; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.15); }
+        }
+
+        /* Topographic contour bottom */
+        .topo-bottom {
+            position: fixed;
+            bottom: 0;
+            left: 0; right: 0;
+            z-index: 0;
+            line-height: 0;
+        }
+        .topo-bottom svg { display: block; width: 100%; }
+
+        /* ===== LAYOUT ===== */
+        .container {
+            max-width: 880px;
+            margin: 0 auto;
+            padding: 52px 24px 120px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ===== CARD BASE ===== */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            position: relative;
+        }
+
+        /* Corner brackets decoration */
+        .card-bracketed::before,
+        .card-bracketed::after {
+            content: '';
+            position: absolute;
+            width: 14px; height: 14px;
+            border-color: var(--hydro);
+            border-style: solid;
+            z-index: 2;
+        }
+        .card-bracketed::before {
+            top: -1px; left: -1px;
+            border-width: 2px 0 0 2px;
+        }
+        .card-bracketed::after {
+            top: -1px; right: -1px;
+            border-width: 2px 2px 0 0;
+        }
+        .card-bottom-brackets::before,
+        .card-bottom-brackets::after {
+            content: '';
+            position: absolute;
+            width: 14px; height: 14px;
+            border-color: var(--hydro);
+            border-style: solid;
+            z-index: 2;
+        }
+        .card-bottom-brackets::before {
+            bottom: -1px; left: -1px;
+            border-width: 0 0 2px 2px;
+        }
+        .card-bottom-brackets::after {
+            bottom: -1px; right: -1px;
+            border-width: 0 2px 2px 0;
+        }
+
+        /* Top accent line */
+        .card-accent-top::before {
+            background: linear-gradient(90deg, transparent, var(--hydro), var(--cyan), transparent);
+            height: 1px;
+            border: none;
+            width: 100%;
+            top: 0; left: 0;
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            text-align: center;
+            margin-bottom: 44px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        /* Engineering Seal */
+        .eng-seal {
+            width: 110px; height: 110px;
+            margin: 0 auto 24px;
+            position: relative;
+        }
+        .eng-seal svg {
+            width: 100%; height: 100%;
+        }
+        .seal-ring {
+            animation: spin 30s linear infinite;
+            transform-origin: 55px 55px;
+        }
+        .seal-inner-ring {
+            animation: spin 20s linear infinite reverse;
+            transform-origin: 55px 55px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Dimension lines decorating title */
+        .header-title-wrap {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 6px;
+        }
+        .dim-line {
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 160px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--hydro), transparent);
+        }
+        .dim-line::before, .dim-line::after {
+            content: '';
+            position: absolute;
+            top: -3px;
+            width: 1px; height: 7px;
+            background: var(--hydro);
+            opacity: 0.7;
+        }
+        .dim-line::before { left: 0; }
+        .dim-line::after  { right: 0; }
+
+        .header h1 {
+            font-family: 'Inter', sans-serif;
+            font-size: 3.8rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #93c5fd 0%, #38bdf8 35%, #06b6d4 65%, #5eead4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.05;
+            letter-spacing: -2px;
+        }
+
+        .header-course-code {
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            color: rgba(56,189,248,0.5);
+            letter-spacing: 3px;
+            margin: 18px 0 10px;
+        }
+
+        .header h2 {
+            font-size: 1rem;
+            font-weight: 400;
+            color: rgba(148,163,184,0.7);
+            letter-spacing: 0.3px;
+        }
+
+        /* Engineering stamp */
+        .eng-stamp {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            border: 1.5px solid rgba(14,165,233,0.3);
+            color: rgba(56,189,248,0.7);
+            padding: 7px 20px;
+            font-family: var(--mono);
+            font-size: 0.68rem;
+            letter-spacing: 2.5px;
+            margin: 16px 0 0;
+            position: relative;
+        }
+        .eng-stamp::before {
+            content: '◆';
+            font-size: 0.55rem;
+            color: var(--hydro);
+        }
+        .eng-stamp::after {
+            content: '◆';
+            font-size: 0.55rem;
+            color: var(--hydro);
+        }
+
+        /* Section label */
+        .section-label {
+            font-family: var(--mono);
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-label::before {
+            content: '//';
+            color: var(--hydro);
+            opacity: 0.7;
+        }
+
+        /* ===== SEARCH CARD ===== */
+        .search-card {
+            padding: 32px 32px 28px;
+            margin-bottom: 24px;
+            animation: fadeInUp 0.8s ease-out 0.15s both;
+            box-shadow: 0 4px 40px rgba(0,0,0,0.5), 0 0 0 1px var(--glass-border);
+        }
+        .search-card-top {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--hydro), var(--cyan), transparent);
+            margin-bottom: 32px;
+            position: relative;
+        }
+        .search-card-top::before {
+            content: 'INPUT';
+            position: absolute;
+            right: 0; top: 6px;
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            color: rgba(14,165,233,0.4);
+            letter-spacing: 2px;
+        }
+
+        .search-wrapper {
+            display: flex;
+            gap: 12px;
+        }
+        .search-input-wrap {
+            position: relative;
+            flex: 1;
+        }
+        .input-prefix {
+            position: absolute;
+            left: 14px; top: 50%;
+            transform: translateY(-50%);
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            color: var(--hydro);
+            pointer-events: none;
+            letter-spacing: 1px;
+        }
+        .search-input {
+            width: 100%;
+            padding: 14px 16px 14px 52px;
+            background: rgba(14,165,233,0.05);
+            border: 1px solid rgba(14,165,233,0.2);
+            border-radius: 0;
+            font-size: 1rem;
+            font-family: 'Inter', monospace;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: 2px;
+            transition: all 0.25s;
+            outline: none;
+        }
+        .search-input::placeholder {
+            color: rgba(100,116,139,0.6);
+            font-weight: 400;
+            letter-spacing: 1px;
+        }
+        .search-input:focus {
+            border-color: var(--hydro);
+            background: rgba(14,165,233,0.09);
+            box-shadow: 0 0 0 3px rgba(14,165,233,0.1), inset 0 0 20px rgba(14,165,233,0.04);
+        }
+
+        .search-btn {
+            padding: 14px 28px;
+            background: linear-gradient(135deg, #0369a1, #0284c7);
+            color: white;
+            border: 1px solid rgba(14,165,233,0.4);
+            border-radius: 0;
+            font-size: 0.82rem;
+            font-weight: 700;
+            font-family: var(--mono);
+            letter-spacing: 2px;
+            cursor: pointer;
+            transition: all 0.25s;
+            white-space: nowrap;
+            box-shadow: 0 0 20px rgba(14,165,233,0.25);
+            position: relative;
+            overflow: hidden;
+        }
+        .search-btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+        .search-btn:hover { box-shadow: 0 0 30px rgba(14,165,233,0.5); transform: translateY(-1px); }
+        .search-btn:hover::after { opacity: 1; }
+        .search-btn:active { transform: translateY(0); }
+
+        .search-hint {
+            margin-top: 12px;
+            font-family: var(--mono);
+            font-size: 0.68rem;
+            color: var(--text-dim);
+            letter-spacing: 0.5px;
+        }
+        .search-hint span { color: rgba(56,189,248,0.5); }
+
+        /* ===== RESULT CARD ===== */
+        .result-card {
+            box-shadow: 0 8px 60px rgba(0,0,0,0.6), 0 0 0 1px var(--glass-border);
+            animation: fadeInUp 0.45s ease-out;
+            overflow: hidden;
+        }
+        .result-card-accent {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--teal), var(--hydro), var(--cyan), transparent);
+        }
+
+        /* Student Header */
+        .student-header {
+            padding: 28px 32px;
+            background: linear-gradient(135deg,
+                rgba(14,165,233,0.12) 0%,
+                rgba(13,148,136,0.08) 60%,
+                rgba(6,182,212,0.05) 100%
+            );
+            border-bottom: 1px solid rgba(14,165,233,0.12);
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .student-info { flex: 1; }
+
+        .student-id-tag {
+            font-family: var(--mono);
+            font-size: 0.72rem;
+            color: var(--hydro);
+            letter-spacing: 2.5px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .student-id-tag::before {
+            content: '';
+            width: 20px; height: 1px;
+            background: var(--hydro);
+            display: inline-block;
+        }
+
+        .student-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+            line-height: 1.3;
+        }
+        .student-meta {
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            letter-spacing: 1px;
+        }
+
+        /* Grade badge */
+        .grade-badge {
+            flex-shrink: 0;
+            width: 72px; height: 72px;
+            border: 2px solid;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .grade-letter {
+            font-family: 'Inter', sans-serif;
+            font-size: 2rem;
+            font-weight: 900;
+            line-height: 1;
+        }
+        .grade-label {
+            font-family: var(--mono);
+            font-size: 0.5rem;
+            letter-spacing: 1px;
+            opacity: 0.7;
+            margin-top: 2px;
+        }
+
+        /* ===== SCORE SUMMARY ===== */
+        .score-summary {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            border-bottom: 1px solid rgba(14,165,233,0.1);
+        }
+        .summary-item {
+            padding: 28px 16px 24px;
+            text-align: center;
+            border-right: 1px solid rgba(14,165,233,0.1);
+            position: relative;
+            transition: background 0.25s;
+        }
+        .summary-item:last-child { border-right: none; }
+        .summary-item:hover { background: rgba(14,165,233,0.04); }
+
+        .summary-coord {
+            position: absolute;
+            top: 8px; right: 10px;
+            font-family: var(--mono);
+            font-size: 0.55rem;
+            color: var(--text-dim);
+            letter-spacing: 1px;
+        }
+
+        .summary-value {
+            font-family: 'Inter', sans-serif;
+            font-size: 2.1rem;
+            font-weight: 800;
+            color: var(--hydro-light);
+            line-height: 1.1;
+            font-variant-numeric: tabular-nums;
+        }
+        .summary-value.gold {
+            background: linear-gradient(135deg, #fde68a, #f59e0b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 2.3rem;
+        }
+        .summary-value sup {
+            font-size: 0.5em;
+            font-weight: 500;
+            color: var(--text-dim);
+            -webkit-text-fill-color: var(--text-dim);
+            vertical-align: super;
+        }
+        .summary-label {
+            font-family: var(--mono);
+            font-size: 0.63rem;
+            color: var(--text-dim);
+            margin-top: 8px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        /* Submitted dots */
+        .submit-dots {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+        }
+        .dot-on  { background: var(--success); box-shadow: 0 0 6px rgba(16,185,129,0.5); }
+        .dot-off { background: rgba(248,113,113,0.4); border: 1px solid rgba(248,113,113,0.3); }
+
+        /* ===== SEMI-CIRCLE GAUGE ===== */
+        .gauge-wrap {
+            position: relative;
+            width: 110px; height: 62px;
+            margin: 0 auto 8px;
+            overflow: visible;
+        }
+        .gauge-wrap svg { overflow: visible; }
+        .gauge-track { fill: none; stroke: rgba(14,165,233,0.1); stroke-width: 7; stroke-linecap: round; }
+        .gauge-zone-red    { fill: none; stroke: rgba(248,113,113,0.25); stroke-width: 7; }
+        .gauge-zone-amber  { fill: none; stroke: rgba(245,158,11,0.25);  stroke-width: 7; }
+        .gauge-zone-green  { fill: none; stroke: rgba(16,185,129,0.25);  stroke-width: 7; }
+        .gauge-zone-blue   { fill: none; stroke: rgba(14,165,233,0.25);  stroke-width: 7; }
+        .gauge-fill {
+            fill: none;
+            stroke-width: 7;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .gauge-needle {
+            transform-origin: 55px 55px;
+            transition: transform 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .gauge-value {
+            position: absolute;
+            bottom: -4px; left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Inter', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--hydro-light);
+            white-space: nowrap;
+        }
+        .gauge-ticks text {
+            font-family: var(--mono);
+            font-size: 5px;
+            fill: rgba(100,116,139,0.6);
+        }
+
+        /* ===== SCORE TABLE ===== */
+        .score-table-wrap {
+            padding: 28px 32px 36px;
+        }
+        .table-header-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .table-header-bar .section-label { margin: 0; }
+        .table-ref {
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            letter-spacing: 1px;
+        }
+
+        .score-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .score-table thead tr {
+            border-bottom: 2px solid rgba(14,165,233,0.3);
+            border-top: 2px solid rgba(14,165,233,0.3);
+        }
+        .score-table thead th {
+            padding: 10px 12px;
+            font-family: var(--mono);
+            font-size: 0.63rem;
+            font-weight: 500;
+            color: var(--hydro);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            background: rgba(14,165,233,0.06);
+            text-align: center;
+        }
+        .score-table thead th:first-child { text-align: left; }
+        .score-table thead th:last-child  { text-align: center; }
+
+        .score-table tbody tr {
+            border-bottom: 1px solid rgba(14,165,233,0.06);
+            transition: background 0.2s;
+        }
+        .score-table tbody tr:hover {
+            background: rgba(14,165,233,0.05);
+        }
+        .score-table tbody td {
+            padding: 13px 12px;
+            font-size: 0.9rem;
+            text-align: center;
+            color: rgba(226,232,240,0.75);
+            vertical-align: middle;
+        }
+        .score-table tbody td:first-child {
+            text-align: left;
+            font-weight: 500;
+            color: rgba(148,163,184,0.85);
+        }
+
+        /* Score cell */
+        .score-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        .score-num {
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+            font-size: 1rem;
+            font-variant-numeric: tabular-nums;
+        }
+        .score-bar-track {
+            width: 54px; height: 3px;
+            background: rgba(255,255,255,0.07);
+            border-radius: 0;
+            overflow: hidden;
+        }
+        .score-bar-fill {
+            height: 100%;
+            transition: width 0.9s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .row-full   .score-num { color: var(--success-light); }
+        .row-full   .score-bar-fill { background: linear-gradient(90deg, #059669, #34d399); }
+        .row-partial .score-num { color: var(--amber-light); }
+        .row-partial .score-bar-fill { background: linear-gradient(90deg, #d97706, #fbbf24); }
+        .row-missing .score-num { color: var(--danger); font-size: 0.75rem; font-weight: 500; }
+        .row-missing .score-bar-fill { background: rgba(248,113,113,0.3); }
+
+        /* Status badge */
+        .status-badge {
+            font-family: var(--mono);
+            font-size: 0.58rem;
+            letter-spacing: 1px;
+            padding: 3px 8px;
+            border: 1px solid;
+            display: inline-block;
+        }
+        .status-pass    { color: var(--success-light); border-color: rgba(52,211,153,0.3); background: rgba(16,185,129,0.08); }
+        .status-partial { color: var(--amber-light);   border-color: rgba(251,191,36,0.3);  background: rgba(245,158,11,0.08); }
+        .status-missing { color: var(--danger);        border-color: rgba(248,113,113,0.3); background: rgba(248,113,113,0.08); }
+
+        .max-cell {
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            color: var(--text-dim);
+        }
+
+        /* Total row */
+        .total-row {
+            border-top: 2px solid rgba(14,165,233,0.25) !important;
+            border-bottom: 2px solid rgba(14,165,233,0.25) !important;
+            background: rgba(14,165,233,0.06) !important;
+        }
+        .total-row td {
+            font-weight: 700;
+            color: var(--text-primary) !important;
+            padding: 14px 12px !important;
+        }
+        .total-row td:first-child {
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            letter-spacing: 1.5px;
+            color: var(--hydro) !important;
+        }
+        .total-num {
+            font-family: 'Inter', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 900;
+            color: var(--amber) !important;
+        }
+
+        /* ===== EMPTY / NOT FOUND ===== */
+        .empty-state {
+            text-align: center;
+            padding: 72px 32px;
+        }
+        .state-icon {
+            width: 88px; height: 88px;
+            margin: 0 auto 24px;
+            border: 1px solid rgba(14,165,233,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .state-icon::before {
+            content: '';
+            position: absolute;
+            inset: -8px;
+            border: 1px dashed rgba(14,165,233,0.15);
+            animation: spin 25s linear infinite;
+        }
+        .state-icon svg { width: 36px; height: 36px; color: rgba(56,189,248,0.35); }
+        .empty-state h3 {
+            font-size: 1.05rem;
+            color: rgba(226,232,240,0.65);
+            margin-bottom: 8px;
+        }
+        .empty-state p {
+            font-family: var(--mono);
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            letter-spacing: 0.5px;
+        }
+
+        .not-found {
+            text-align: center;
+            padding: 64px 32px;
+            animation: shake 0.4s ease-out;
+        }
+        .not-found .state-icon {
+            border-color: rgba(248,113,113,0.25);
+        }
+        .not-found .state-icon::before {
+            border-color: rgba(248,113,113,0.15);
+        }
+        .not-found .state-icon svg { color: var(--danger); }
+        .not-found h3 { color: rgba(226,232,240,0.8); font-size: 1.05rem; margin-bottom: 8px; }
+        .not-found p {
+            font-family: var(--mono);
+            font-size: 0.72rem;
+            color: rgba(248,113,113,0.5);
+        }
+
+        /* ===== FOOTER ===== */
+        .footer {
+            text-align: center;
+            margin-top: 52px;
+            animation: fadeInUp 0.8s ease-out 0.3s both;
+        }
+        .footer-stamp {
+            display: inline-block;
+            border: 1px solid rgba(14,165,233,0.15);
+            padding: 12px 28px;
+            position: relative;
+        }
+        .footer-stamp::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: 20px;
+            width: 40px; height: 1px;
+            background: var(--bg-deep);
+        }
+        .footer-stamp::after {
+            content: 'OFFICIAL RECORD';
+            position: absolute;
+            top: -6px; left: 20px;
+            font-family: var(--mono);
+            font-size: 0.5rem;
+            color: rgba(14,165,233,0.4);
+            letter-spacing: 1.5px;
+            background: var(--bg-deep);
+            padding: 0 4px;
+        }
+        .footer-text {
+            font-family: var(--mono);
+            font-size: 0.68rem;
+            color: var(--text-dim);
+            letter-spacing: 1.5px;
+        }
+        .footer-text span { color: rgba(14,165,233,0.4); margin: 0 8px; }
+        .footer-rev {
+            font-family: var(--mono);
+            font-size: 0.58rem;
+            color: rgba(100,116,139,0.35);
+            margin-top: 6px;
+            letter-spacing: 1px;
+        }
+
+        /* ===== ANIMATIONS ===== */
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-24px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(24px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%  { transform: translateX(-7px); }
+            40%  { transform: translateX(7px); }
+            60%  { transform: translateX(-3px); }
+            80%  { transform: translateX(3px); }
+        }
+        @keyframes countUp {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 640px) {
+            .container { padding: 28px 14px 90px; }
+            .header h1 { font-size: 2.6rem; }
+            .search-card { padding: 24px 18px 20px; }
+            .search-wrapper { flex-direction: column; }
+            .search-btn { width: 100%; }
+            .student-header { padding: 20px 18px; flex-direction: column; gap: 14px; }
+            .grade-badge { align-self: flex-start; }
+            .score-summary { grid-template-columns: repeat(3, 1fr); }
+            .summary-item { padding: 18px 6px 14px; }
+            .summary-value { font-size: 1.45rem; }
+            .summary-value.gold { font-size: 1.6rem; }
+            .score-table-wrap { padding: 18px 14px 24px; }
+            .score-table thead th,
+            .score-table tbody td { padding: 10px 7px; font-size: 0.78rem; }
+            .score-bar-track { width: 36px; }
+            .gauge-wrap { width: 90px; height: 52px; }
+            .eng-seal { width: 88px; height: 88px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Blueprint Background -->
+    <div class="bg-blueprint">
+        <div class="glow-spot glow-1"></div>
+        <div class="glow-spot glow-2"></div>
+        <div class="flow-lines" id="flowLines"></div>
+    </div>
+
+    <!-- Topographic bottom -->
+    <div class="topo-bottom">
+        <svg viewBox="0 0 1800 100" preserveAspectRatio="none" style="height:70px">
+            <defs>
+                <linearGradient id="topoGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%"   stop-color="rgba(14,165,233,0.04)"/>
+                    <stop offset="50%"  stop-color="rgba(6,182,212,0.07)"/>
+                    <stop offset="100%" stop-color="rgba(13,148,136,0.04)"/>
+                </linearGradient>
+            </defs>
+            <path fill="url(#topoGrad)"
+                d="M0,40 C200,20 400,60 600,35 C800,10 1000,55 1200,30 C1400,5 1600,50 1800,25 L1800,100 L0,100 Z" opacity="0.8"/>
+            <path fill="rgba(14,165,233,0.03)"
+                d="M0,60 C250,40 500,70 750,45 C1000,20 1250,65 1500,40 C1650,25 1750,55 1800,45 L1800,100 L0,100 Z"/>
+            <path fill="none" stroke="rgba(14,165,233,0.12)" stroke-width="1"
+                d="M0,40 C200,20 400,60 600,35 C800,10 1000,55 1200,30 C1400,5 1600,50 1800,25"/>
+            <path fill="none" stroke="rgba(6,182,212,0.08)" stroke-width="1"
+                d="M0,60 C250,40 500,70 750,45 C1000,20 1250,65 1500,40 C1650,25 1750,55 1800,45"/>
+        </svg>
+    </div>
+
+    <div class="container">
+
+        <!-- Header -->
+        <header class="header">
+            <!-- Engineering Seal SVG -->
+            <div class="eng-seal">
+                <svg viewBox="0 0 110 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="sealGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#0ea5e9"/>
+                            <stop offset="100%" stop-color="#0d9488"/>
+                        </linearGradient>
+                    </defs>
+                    <!-- Outer rotating ring with gear teeth -->
+                    <g class="seal-ring">
+                        <circle cx="55" cy="55" r="50" stroke="rgba(14,165,233,0.2)" stroke-width="1" fill="none"/>
+                        <circle cx="55" cy="55" r="46" stroke="rgba(14,165,233,0.1)" stroke-width="1" fill="none" stroke-dasharray="2 4"/>
+                        <!-- Gear teeth -->
+                        <g stroke="rgba(14,165,233,0.4)" stroke-width="1.5">
+                            <line x1="55" y1="5"  x2="55" y2="1"/>
+                            <line x1="55" y1="109" x2="55" y2="105"/>
+                            <line x1="5"  y1="55"  x2="1"  y2="55"/>
+                            <line x1="109" y1="55" x2="105" y2="55"/>
+                            <line x1="20.4" y1="20.4" x2="17.6" y2="17.6"/>
+                            <line x1="89.6" y1="89.6" x2="92.4" y2="92.4"/>
+                            <line x1="20.4" y1="89.6" x2="17.6" y2="92.4"/>
+                            <line x1="89.6" y1="20.4" x2="92.4" y2="17.6"/>
+                            <line x1="35"  y1="8.8"  x2="34"  y2="5"/>
+                            <line x1="75"  y1="101.2" x2="76" y2="105"/>
+                            <line x1="8.8" y1="35"   x2="5"   y2="34"/>
+                            <line x1="101.2" y1="75" x2="105" y2="76"/>
+                            <line x1="75"  y1="8.8"  x2="76"  y2="5"/>
+                            <line x1="35"  y1="101.2" x2="34" y2="105"/>
+                            <line x1="8.8" y1="75"   x2="5"   y2="76"/>
+                            <line x1="101.2" y1="35" x2="105" y2="34"/>
+                        </g>
+                    </g>
+                    <!-- Circular text path -->
+                    <g class="seal-inner-ring">
+                        <circle cx="55" cy="55" r="40" stroke="rgba(14,165,233,0.15)" stroke-width="1" fill="none"/>
+                        <defs>
+                            <path id="textCircle" d="M 55,55 m -34,0 a 34,34 0 1,1 68,0 a 34,34 0 1,1 -68,0"/>
+                        </defs>
+                        <text font-family="'IBM Plex Mono',monospace" font-size="5.5" fill="rgba(56,189,248,0.55)" letter-spacing="3">
+                            <textPath href="#textCircle">CIVIL ENGINEERING · HYDROLOGY · SUT · </textPath>
+                        </text>
+                    </g>
+                    <!-- Inner content: water drop + gear -->
+                    <circle cx="55" cy="55" r="26" fill="rgba(14,165,233,0.06)" stroke="rgba(14,165,233,0.2)" stroke-width="1"/>
+                    <!-- Water drop icon -->
+                    <path d="M55 38 C51 44 45 49 45 54.5 a10 10 0 0 0 20 0 C65 49 59 44 55 38 Z"
+                          fill="rgba(14,165,233,0.25)" stroke="rgba(56,189,248,0.7)" stroke-width="1.2" stroke-linejoin="round"/>
+                    <path d="M51 55 a4 4 0 0 0 8 0" stroke="#38bdf8" stroke-width="1" fill="none" stroke-linecap="round"/>
+                </svg>
+            </div>
+
+            <div class="header-title-wrap">
+                <h1>Hydrology</h1>
+                <div class="dim-line"></div>
+            </div>
+
+            <div class="header-course-code">ENGCE — SCHOOL OF CIVIL ENGINEERING · 3/2568</div>
+            <h2>ประกาศคะแนนเก็บ &nbsp;·&nbsp; ภาคการศึกษาที่ 3/2568</h2>
+            <div class="eng-stamp">STUDENT SCORE LOOKUP SYSTEM</div>
+        </header>
+
+        <!-- Search Card -->
+        <div class="card card-bracketed card-bottom-brackets search-card">
+            <div class="search-card-top"></div>
+            <div class="section-label" style="margin-bottom:16px;">STUDENT ID LOOKUP</div>
+            <div class="search-wrapper">
+                <div class="search-input-wrap">
+                    <span class="input-prefix">ID ▸</span>
+                    <input type="text" class="search-input" id="searchInput"
+                           placeholder="B67XXXXX" autocomplete="off" spellcheck="false">
+                </div>
+                <button class="search-btn" onclick="searchStudent()">SEARCH</button>
+            </div>
+            <div class="search-hint">กรอกรหัสนักศึกษา เช่น <span>B6712877</span> แล้วกด Enter หรือปุ่ม SEARCH</div>
+        </div>
+
+        <!-- Result Area -->
+        <div id="resultArea">
+            <div class="card card-bracketed card-bottom-brackets result-card">
+                <div class="result-card-accent"></div>
+                <div class="empty-state">
+                    <div class="state-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 2C8.5 7 5 9.5 5 14a7 7 0 0 0 14 0c0-4.5-3.5-7-7-12Z"/>
+                        </svg>
+                    </div>
+                    <h3>กรอกรหัสนักศึกษาเพื่อดูคะแนน</h3>
+                    <p>// ระบบจะแสดงคะแนนเก็บทั้งหมดของคุณในวิชา Hydrology</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="footer-stamp">
+                <div class="footer-text">
+                    วิชา Hydrology
+                    <span>·</span>
+                    สาขาวิชาวิศวกรรมโยธา
+                    <span>·</span>
+                    ภาคการศึกษาที่ 3/2568
+                </div>
+                <div class="footer-rev">Scale: 1:1 &nbsp;|&nbsp; Rev: A &nbsp;|&nbsp; Date: 2025</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ===== Flow line generator =====
+    (function() {
+        const container = document.getElementById('flowLines');
+        for (let i = 0; i < 8; i++) {
+            const el = document.createElement('div');
+            el.className = 'flow-line';
+            const w = 200 + Math.random() * 400;
+            el.style.cssText = `
+                width:${w}px;
+                top:${Math.random()*100}%;
+                animation-duration:${20+Math.random()*30}s;
+                animation-delay:${Math.random()*25}s;
+                opacity:${0.3+Math.random()*0.4};
+            `;
+            container.appendChild(el);
+        }
+    })();
+
+    // ===== Student data =====
+    const studentData = [
+        {"id":"B6705770","name":"นายณัฐวุฒิ เนตรทองหลาง","no":47,"hw1":5,"hw2":5,"quiz1":2.5,"cw1":5,"cw2":2,"cw3":5,"hw3":5},
+        {"id":"B6707132","name":"นายธนวัฒน์ กิจครบุรี","no":48,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":4,"cw3":5,"hw3":5},
+        {"id":"B6707699","name":"นายพิชัยยุทธ น่วมภักดี","no":49,"hw1":2.5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6708849","name":"นางสาวปนัดดา ตรีพรม","no":50,"hw1":5,"hw2":5,"quiz1":4.5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6708948","name":"นางสาวภัชราภา โพธิ์ชัย","no":51,"hw1":5,"hw2":5,"quiz1":4.75,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6709129","name":"นางสาวภณิดา จุลไธสง","no":52,"hw1":3,"hw2":5,"quiz1":4.75,"cw1":null,"cw2":5,"cw3":5,"hw3":null},
+        {"id":"B6709501","name":"นายพัฒนศักดิ์ ทองปาน","no":53,"hw1":3,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6709860","name":"นายพุฒิพงศ์ ยอดยิ่งยงค์","no":54,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6710217","name":"นายธนกฤต พลหาราช","no":55,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6710316","name":"นายมานะศักดิ์ แก้วอินตา","no":56,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":4.5},
+        {"id":"B6710514","name":"นางสาวกัญญารัตน์ เอี่ยมโคกสูง","no":57,"hw1":5,"hw2":5,"quiz1":4.75,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6710644","name":"นายพยัคฆ์ เพ็ชรไธสง","no":58,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6711047","name":"นางสาวเบญจวรรณ ขำปู่","no":59,"hw1":3,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6711375","name":"นางสาวเพ็ญนภา ศรีสด","no":60,"hw1":3,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6711849","name":"นางสาวปราณปรียา ดียิ้ม","no":61,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6712044","name":"นายธีรภัทร์ ชุดขุนทด","no":62,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":2,"cw3":5,"hw3":5},
+        {"id":"B6712136","name":"นายชยุตพงศ์ นาชัยเพชร","no":63,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":2,"cw3":5,"hw3":4},
+        {"id":"B6712877","name":"นายสุกฤษฎิ์ นาราษฎร์","no":64,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6712952","name":"นายเจตินัย บุตรวัง","no":65,"hw1":4,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":4.5},
+        {"id":"B6713713","name":"นายรพีภัณ พฤกษชาติ","no":66,"hw1":4,"hw2":5,"quiz1":4.5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6714024","name":"นางสาวธวัลรัตน์ ตามบุญ","no":67,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6714345","name":"นางสาวดลนภา บุษดา","no":68,"hw1":4,"hw2":5,"quiz1":3,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6714390","name":"นายอนิวัต ใจหาญ","no":69,"hw1":5,"hw2":5,"quiz1":5,"cw1":null,"cw2":5,"cw3":null,"hw3":null},
+        {"id":"B6714932","name":"นายศุภกิจ พงษ์สวัสดิ์","no":70,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6716431","name":"นางสาวอริศรา สุขังสูงเนิน","no":71,"hw1":5,"hw2":5,"quiz1":4.75,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6716875","name":"นายกฤชกร พุ่มจันทร์","no":72,"hw1":5,"hw2":5,"quiz1":4,"cw1":5,"cw2":5,"cw3":2,"hw3":null},
+        {"id":"B6717865","name":"นายเติมพงศ์ ช้างแก้ว","no":73,"hw1":4,"hw2":5,"quiz1":4,"cw1":5,"cw2":null,"cw3":5,"hw3":null},
+        {"id":"B6718008","name":"นายพัชรดนัย บุตรทา","no":74,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6718145","name":"นายศรุติ จันทกลิ่น","no":75,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6718404","name":"นายสุรินทร์ สนิทรักษ์","no":76,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":2,"hw3":5},
+        {"id":"B6718466","name":"นายธันวา ภูมะณีย์","no":77,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6724832","name":"นายมีโชค อินสูนย์","no":78,"hw1":5,"hw2":5,"quiz1":4.75,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6726348","name":"นายธิติวุฒิ ปัญญา","no":79,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6726515","name":"นายภูมเรศ มาศเลิง","no":80,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6726560","name":"นายปารมีย์ หริ่งกระโทก","no":81,"hw1":3,"hw2":5,"quiz1":4.75,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6726607","name":"นายจิรภาส วศะกุลพฤทธิ์","no":82,"hw1":4,"hw2":4,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":4.5},
+        {"id":"B6729059","name":"นายณัฐนนท์ นามเดช","no":83,"hw1":4,"hw2":5,"quiz1":4.75,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6731854","name":"นางสาวฑิฆัมพร จันทเล","no":84,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":4},
+        {"id":"B6732486","name":"นายปิยะ สีลา","no":85,"hw1":5,"hw2":5,"quiz1":4.75,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6733124","name":"นางสาวปวีณ์นุช รอบรู้","no":86,"hw1":5,"hw2":5,"quiz1":4.75,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6733414","name":"นายสุวิจักขณ์ คำจุมจัง","no":87,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":5},
+        {"id":"B6737221","name":"นายสุรเชษฐ์ ดวงโสภา","no":88,"hw1":3,"hw2":5,"quiz1":null,"cw1":null,"cw2":5,"cw3":null,"hw3":2},
+        {"id":"B6742638","name":"นางสาวฝาดีล๊ะ ต่วนมะ","no":89,"hw1":3,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":null,"hw3":5},
+        {"id":"B6742751","name":"นางสาวทรรศนันท์ พุทธเสน","no":90,"hw1":3,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":4.5},
+        {"id":"B6742898","name":"นางสาวศศิวิมล ลาดใจ","no":91,"hw1":3,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":null},
+        {"id":"B6747114","name":"นางสาวปิยธิดา เมล์พ่วง","no":92,"hw1":3,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":null,"hw3":5},
+        {"id":"B6747138","name":"นางสาวพิรดา ช่างไม้","no":93,"hw1":5,"hw2":5,"quiz1":5,"cw1":5,"cw2":5,"cw3":5,"hw3":2},
+        {"id":"B6747435","name":"นายอวิรุทธิ์ แสงแก้ว","no":94,"hw1":4,"hw2":5,"quiz1":5,"cw1":5,"cw2":2,"cw3":5,"hw3":5}
+    ];
+
+    const scoreFields = [
+        { key: 'hw1',   label: 'แบบฝึกหัดที่ 1', eng: 'HW 1',   max: 5 },
+        { key: 'hw2',   label: 'แบบฝึกหัดที่ 2', eng: 'HW 2',   max: 5 },
+        { key: 'quiz1', label: 'QUIZ 1',          eng: 'Quiz 1', max: 5 },
+        { key: 'cw1',   label: 'CW1',             eng: 'CW 1',   max: 5 },
+        { key: 'cw2',   label: 'CW2',             eng: 'CW 2',   max: 5 },
+        { key: 'cw3',   label: 'CW3',             eng: 'CW 3',   max: 5 },
+        { key: 'hw3',   label: 'แบบฝึกหัดที่ 3', eng: 'HW 3',   max: 5 }
+    ];
+
+    document.getElementById('searchInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') searchStudent();
+    });
+
+    function getGrade(pct) {
+        if (pct >= 80) return { letter: 'A',  color: '#38bdf8', borderColor: 'rgba(56,189,248,0.5)' };
+        if (pct >= 75) return { letter: 'B+', color: '#06b6d4', borderColor: 'rgba(6,182,212,0.5)' };
+        if (pct >= 70) return { letter: 'B',  color: '#10b981', borderColor: 'rgba(16,185,129,0.5)' };
+        if (pct >= 65) return { letter: 'C+', color: '#84cc16', borderColor: 'rgba(132,204,22,0.5)' };
+        if (pct >= 60) return { letter: 'C',  color: '#f59e0b', borderColor: 'rgba(245,158,11,0.5)' };
+        if (pct >= 55) return { letter: 'D+', color: '#f97316', borderColor: 'rgba(249,115,22,0.5)' };
+        if (pct >= 50) return { letter: 'D',  color: '#ef4444', borderColor: 'rgba(239,68,68,0.5)' };
+        return { letter: 'F', color: '#dc2626', borderColor: 'rgba(220,38,38,0.5)' };
+    }
+
+    // Semi-circle gauge SVG builder
+    // Arc from 180deg to 0deg (left to right on top semicircle)
+    // r=48, cx=55, cy=55
+    function polarToXY(cx, cy, r, angleDeg) {
+        const rad = (angleDeg * Math.PI) / 180;
+        return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+    }
+    function arcPath(cx, cy, r, startDeg, endDeg) {
+        const s = polarToXY(cx, cy, r, startDeg);
+        const e = polarToXY(cx, cy, r, endDeg);
+        const large = Math.abs(endDeg - startDeg) > 180 ? 1 : 0;
+        return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`;
+    }
+
+    function buildGauge(pct) {
+        // Gauge spans from 180° to 360° (bottom-left to bottom-right via top)
+        const CX = 55, CY = 58, R = 44;
+        const START = 180, END = 360;
+        const totalArc = END - START; // 180°
+
+        // Zone boundaries in percentage
+        const zones = [
+            { from: 0,  to: 40, cls: 'gauge-zone-red'   },
+            { from: 40, to: 60, cls: 'gauge-zone-amber'  },
+            { from: 60, to: 80, cls: 'gauge-zone-green'  },
+            { from: 80, to:100, cls: 'gauge-zone-blue'   },
+        ];
+        const circumference = Math.PI * R; // half circle arc length
+
+        // Build zone arcs
+        let zoneSvg = '';
+        zones.forEach(z => {
+            const zStart = START + (z.from / 100) * totalArc;
+            const zEnd   = START + (z.to   / 100) * totalArc;
+            const d = arcPath(CX, CY, R, zStart, zEnd);
+            const arcLen = ((z.to - z.from) / 100) * circumference;
+            zoneSvg += `<path d="${d}" class="${z.cls}" stroke-dasharray="${arcLen} ${circumference}" fill="none" stroke-width="7" stroke-linecap="butt"/>`;
+        });
+
+        // Fill arc
+        const fillDeg = START + (pct / 100) * totalArc;
+        const fillD = arcPath(CX, CY, R, START, fillDeg);
+        const fillLen = (pct / 100) * circumference;
+        const fillColor = pct >= 80 ? '#38bdf8' : pct >= 60 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#f87171';
+
+        // Needle
+        const needleAngle = START + (pct / 100) * totalArc;
+        const needleTip = polarToXY(CX, CY, R - 6, needleAngle);
+        const needleBase1 = polarToXY(CX, CY, 5, needleAngle + 90);
+        const needleBase2 = polarToXY(CX, CY, 5, needleAngle - 90);
+
+        // Tick marks
+        let ticks = '';
+        for (let i = 0; i <= 10; i++) {
+            const a = START + (i / 10) * totalArc;
+            const inner = polarToXY(CX, CY, R - 10, a);
+            const outer = polarToXY(CX, CY, R - 4, a);
+            const isMajor = i % 5 === 0;
+            ticks += `<line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}"
+                stroke="rgba(100,116,139,${isMajor ? '0.6' : '0.3'})"
+                stroke-width="${isMajor ? 1.5 : 0.8}"/>`;
+            if (isMajor) {
+                const labelPos = polarToXY(CX, CY, R - 16, a);
+                ticks += `<text x="${labelPos.x}" y="${labelPos.y}" text-anchor="middle" dominant-baseline="central"
+                    font-family="'IBM Plex Mono',monospace" font-size="5" fill="rgba(100,116,139,0.55)">${i*10}%</text>`;
+            }
+        }
+
+        return `
+        <svg viewBox="0 0 110 70" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;overflow:visible">
+            <!-- Track -->
+            <path d="${arcPath(CX, CY, R, START, END)}"
+                fill="none" stroke="rgba(14,165,233,0.08)" stroke-width="7" stroke-linecap="butt"/>
+            <!-- Zones -->
+            ${zoneSvg}
+            <!-- Ticks -->
+            ${ticks}
+            <!-- Fill arc -->
+            <path id="gaugeFill" d="${arcPath(CX, CY, R, START, START)}"
+                fill="none" stroke="${fillColor}" stroke-width="7" stroke-linecap="round"
+                stroke-dasharray="0 ${circumference}"
+                style="transition: stroke-dasharray 1.2s cubic-bezier(0.34,1.56,0.64,1)"/>
+            <!-- Needle -->
+            <polygon id="gaugeNeedle"
+                points="${needleBase1.x},${needleBase1.y} ${needleBase2.x},${needleBase2.y} ${polarToXY(CX,CY,R-6,START).x},${polarToXY(CX,CY,R-6,START).y}"
+                fill="rgba(226,232,240,0.9)"
+                style="transform-origin:${CX}px ${CY}px; transform:rotate(0deg); transition:transform 1.2s cubic-bezier(0.34,1.56,0.64,1)"/>
+            <!-- Center dot -->
+            <circle cx="${CX}" cy="${CY}" r="4" fill="#1e2d45" stroke="rgba(14,165,233,0.5)" stroke-width="1.5"/>
+        </svg>`;
+    }
+
+    function searchStudent() {
+        const query = document.getElementById('searchInput').value.trim().toUpperCase();
+        const resultArea = document.getElementById('resultArea');
+
+        if (!query) {
+            resultArea.innerHTML = emptyStateHTML('กรุณากรอกรหัสนักศึกษา', '// ระบบจะแสดงคะแนนเก็บทั้งหมดของคุณในวิชา Hydrology');
+            return;
+        }
+
+        const student = studentData.find(s => s.id === query);
+        if (!student) {
+            resultArea.innerHTML = notFoundHTML(query);
+            return;
+        }
+
+        const totalMax = scoreFields.reduce((s, f) => s + f.max, 0);
+        let totalScore = 0, countSubmitted = 0;
+        scoreFields.forEach(f => {
+            const v = student[f.key];
+            if (v !== null && v !== undefined) { totalScore += v; countSubmitted++; }
+        });
+        const percentage = Math.round((totalScore / totalMax) * 100);
+        const grade = getGrade(percentage);
+
+        // Build dots
+        const dots = scoreFields.map(f => {
+            const v = student[f.key];
+            const has = v !== null && v !== undefined;
+            return `<div class="dot ${has ? 'dot-on' : 'dot-off'}" title="${f.eng}: ${has ? v : 'ไม่มี'}"></div>`;
+        }).join('');
+
+        // Build table rows
+        let tableRows = '';
+        scoreFields.forEach((f, i) => {
+            const val = student[f.key];
+            const hasScore = val !== null && val !== undefined;
+            const isFull = hasScore && val >= f.max;
+            const pct = hasScore ? (val / f.max * 100) : 0;
+            const rowCls = !hasScore ? 'row-missing' : isFull ? 'row-full' : 'row-partial';
+            const valStr = hasScore ? val : '—';
+            const statusCls = !hasScore ? 'status-missing' : isFull ? 'status-pass' : 'status-partial';
+            const statusTxt = !hasScore ? 'MISSING' : isFull ? 'FULL' : 'PARTIAL';
+            tableRows += `
+            <tr class="${rowCls}">
+                <td>${f.label} <span style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;color:rgba(100,116,139,0.5);margin-left:4px">${f.eng}</span></td>
+                <td>
+                    <div class="score-cell">
+                        <div class="score-num">${valStr}</div>
+                        <div class="score-bar-track">
+                            <div class="score-bar-fill" data-pct="${pct}" style="width:0%"></div>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="max-cell">/${f.max}</span></td>
+                <td><span class="status-badge ${statusCls}">${statusTxt}</span></td>
+            </tr>`;
+        });
+
+        resultArea.innerHTML = `
+        <div class="card card-bracketed card-bottom-brackets result-card">
+            <div class="result-card-accent"></div>
+
+            <div class="student-header">
+                <div class="student-info">
+                    <div class="student-id-tag">${student.id}</div>
+                    <div class="student-name">${student.name}</div>
+                    <div class="student-meta">NO.${student.no} &nbsp;·&nbsp; CIVIL ENGINEERING &nbsp;·&nbsp; SUT</div>
+                </div>
+                <div class="grade-badge" style="border-color:${grade.borderColor}; background:${grade.color}18;">
+                    <div class="grade-letter" style="color:${grade.color}">${grade.letter}</div>
+                    <div class="grade-label" style="color:${grade.color}">GRADE</div>
+                </div>
+            </div>
+
+            <div class="score-summary">
+                <div class="summary-item">
+                    <div class="summary-coord">01</div>
+                    <div class="summary-value gold" id="totalVal" style="opacity:0">
+                        ${totalScore}<sup>/${totalMax}</sup>
+                    </div>
+                    <div class="summary-label">TOTAL SCORE</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-coord">02</div>
+                    <div class="gauge-wrap" id="gaugeWrap">
+                        ${buildGauge(percentage)}
+                    </div>
+                    <div class="gauge-value" id="gaugeVal">0%</div>
+                    <div class="summary-label" style="margin-top:14px">PERCENTAGE</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-coord">03</div>
+                    <div class="summary-value" id="submittedVal" style="opacity:0">
+                        ${countSubmitted}<sup>/${scoreFields.length}</sup>
+                    </div>
+                    <div class="submit-dots">${dots}</div>
+                    <div class="summary-label">SUBMITTED</div>
+                </div>
+            </div>
+
+            <div class="score-table-wrap">
+                <div class="table-header-bar">
+                    <div class="section-label">SCORE BREAKDOWN</div>
+                    <div class="table-ref">REF: HY-${student.id}-3/68</div>
+                </div>
+                <table class="score-table">
+                    <thead>
+                        <tr>
+                            <th>ASSIGNMENT</th>
+                            <th>SCORE</th>
+                            <th>MAX</th>
+                            <th>STATUS</th>
+                        </tr>
+                    </thead>
+                    <tbody>${tableRows}</tbody>
+                    <tbody>
+                        <tr class="total-row">
+                            <td>GRAND TOTAL</td>
+                            <td><span class="total-num">${totalScore}</span></td>
+                            <td><span class="max-cell">/${totalMax}</span></td>
+                            <td><span class="status-badge ${percentage >= 60 ? 'status-pass' : 'status-missing'}">${percentage}%</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+
+        // Animate after render
+        requestAnimationFrame(() => {
+            setTimeout(() => {
+                // Fade in cards
+                const tv = document.getElementById('totalVal');
+                const sv = document.getElementById('submittedVal');
+                if (tv) tv.style.cssText = 'opacity:1; animation: countUp 0.5s ease-out';
+                if (sv) sv.style.cssText = 'opacity:1; animation: countUp 0.5s ease-out 0.15s both';
+
+                // Animate gauge fill
+                const fill = document.getElementById('gaugeFill');
+                const needle = document.getElementById('gaugeNeedle');
+                const circumference = Math.PI * 44;
+                if (fill) {
+                    const fillLen = (percentage / 100) * circumference;
+                    fill.style.strokeDasharray = `${fillLen} ${circumference}`;
+                }
+                if (needle) {
+                    needle.style.transform = `rotate(${(percentage / 100) * 180}deg)`;
+                }
+
+                // Count up gauge value
+                const gv = document.getElementById('gaugeVal');
+                let cur = 0;
+                const step = Math.max(1, Math.ceil(percentage / 40));
+                const timer = setInterval(() => {
+                    cur = Math.min(cur + step, percentage);
+                    if (gv) gv.textContent = cur + '%';
+                    if (cur >= percentage) clearInterval(timer);
+                }, 25);
+
+                // Animate score bars
+                document.querySelectorAll('.score-bar-fill[data-pct]').forEach((bar, i) => {
+                    setTimeout(() => {
+                        bar.style.width = bar.dataset.pct + '%';
+                    }, i * 60);
+                });
+            }, 80);
+        });
+    }
+
+    function emptyStateHTML(title, sub) {
+        return `<div class="card card-bracketed card-bottom-brackets result-card">
+            <div class="result-card-accent"></div>
+            <div class="empty-state">
+                <div class="state-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 2C8.5 7 5 9.5 5 14a7 7 0 0 0 14 0c0-4.5-3.5-7-7-12Z"/>
+                    </svg>
+                </div>
+                <h3>${title}</h3>
+                <p>${sub}</p>
+            </div>
+        </div>`;
+    }
+
+    function notFoundHTML(query) {
+        return `<div class="card card-bracketed card-bottom-brackets result-card">
+            <div class="result-card-accent" style="background:linear-gradient(90deg,transparent,#f87171,transparent)"></div>
+            <div class="not-found">
+                <div class="state-icon" style="border-color:rgba(248,113,113,0.25)">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="color:#f87171">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/>
+                    </svg>
+                </div>
+                <h3>ไม่พบข้อมูลนักศึกษา</h3>
+                <p>// ERROR: ID "${query}" not found — กรุณาตรวจสอบรหัสนักศึกษาอีกครั้ง</p>
+            </div>
+        </div>`;
+    }
+    </script>
+</body>
+</html>
